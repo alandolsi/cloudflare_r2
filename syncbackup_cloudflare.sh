@@ -4,8 +4,8 @@
 # Requires Rclone (v1.60+)
 #
 
-# Get the directory where this script is located
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get the directory where this script is located (resolve symlinks)
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 
 # Try to load backup.env from script directory if it exists and variables are not set
 if [ -f "$SCRIPT_DIR/backup.env" ] && [ -z "$SOURCE" ]; then
