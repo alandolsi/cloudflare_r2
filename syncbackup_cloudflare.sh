@@ -134,7 +134,7 @@ fi
 
 # Create lock file
 echo $$ > "$LOCKFILE"
-trap "rm -f $LOCKFILE" EXIT
+trap "rm -f '$LOCKFILE'; exit" EXIT INT TERM
 
 # Check if rclone is available
 if [ ! -x "$RCLONE" ]; then
@@ -160,15 +160,32 @@ if [ "$ACTION" = "restore" ] || [ "$ACTION" = "import" ]; then
     mkdir -p "$RESTORE_DEST"
     echo "--- Restore Start: $(date) ---" >> "$LOGFILE"
     echo "Starting restore from $RESTORE_NAME to $RESTORE_DEST ..." >> "$LOGFILE"
+    
+    # Show progress on terminal, log to file
+    echo ""
+    echo "Restoring $RESTORE_NAME to $RESTORE_DEST ..."
+    echo "This may take several minutes depending on backup size..."
+    echo ""
 
-    "$RCLONE" copy "${RCLONE_DEST}/${RESTORE_NAME}" "$RESTORE_DEST" --transfers=2 --checkers=4 >> "$LOGFILE" 2>&1
+    "$RCLONE" copy "${RCLONE_DEST}/${RESTORE_NAME}" "$RESTORE_DEST" \
+        --progress \
+        --stats 5s \
+        --transfers=4 \
+        --checkers=8 \
+        2>&1 | tee -a "$LOGFILE"
+    
+    RCLONE_EXIT=${PIPESTATUS[0]}
 
-    if [ $? -eq 0 ]; then
-        echo "Restore: SUCCESS" >> "$LOGFILE"
+    if [ $RCLONE_EXIT -eq 0 ]; then
+        echo ""
+        echo "✓ Restore: SUCCESS" | tee -a "$LOGFILE"
         echo "--- Restore End: $(date) ---" >> "$LOGFILE"
+        rm -f "$LOCKFILE"
         exit 0
     else
-        echo "Restore: ERROR (See above)" >> "$LOGFILE"
+        echo ""
+        echo "✗ Restore: ERROR (See log)" | tee -a "$LOGFILE"
+        rm -f "$LOCKFILE"
         exit 1
     fi
 fi
@@ -177,17 +194,38 @@ echo "--- Backup Start: $(date) ---" >> "$LOGFILE"
 
 # 1. UPLOAD (COPY)
 echo "Starting upload to Cloudflare..." >> "$LOGFILE"
-"$RCLONE" copy "$SOURCE" "$RCLONE_DEST" --transfers=2 --checkers=4 >> "$LOGFILE" 2>&1
+echo ""
+echo "========================================="
+echo "  Uploading to Cloudflare R2..."
+echo "========================================="
+echo ""
 
-if [ $? -eq 0 ]; then
-    echo "Rclone Copy: SUCCESS" >> "$LOGFILE"
+"$RCLONE" copy "$SOURCE" "$RCLONE_DEST" \
+    --progress \
+    --stats 10s \
+    --transfers=4 \
+    --checkers=8 \
+    2>&1 | tee -a "$LOGFILE"
+
+RCLONE_EXIT=${PIPESTATUS[0]}
+
+RCLONE_EXIT=${PIPESTATUS[0]}
+
+echo ""
+if [ $RCLONE_EXIT -eq 0 ]; then
+    echo "✓ Upload: SUCCESS" | tee -a "$LOGFILE"
 else
-    echo "Rclone Copy: ERROR (See above)" >> "$LOGFILE"
+    echo "✗ Upload: ERROR (See log)" | tee -a "$LOGFILE"
     exit 1
 fi
+echo ""
 
 # 2. CLEANUP (Delete backups older than RETENTION_DAYS days)
-echo "Checking old backups on Cloudflare (Keeping last $RETENTION_DAYS days)..." >> "$LOGFILE"
+echo "========================================="
+echo "  Cleanup old backups..."
+echo "========================================="
+echo ""
+echo "Checking old backups on Cloudflare (Keeping last $RETENTION_DAYS days)..." | tee -a "$LOGFILE"
 
 # Calculate cutoff date (X days ago)
 CUTOFF_DATE=$(date -d "$RETENTION_DAYS days ago" +%s)
@@ -198,19 +236,25 @@ CUTOFF_DATE=$(date -d "$RETENTION_DAYS days ago" +%s)
     FILE_DATE=$(date -d "$TIMESTAMP" +%s 2>/dev/null)
     
     if [ $? -eq 0 ] && [ "$FILE_DATE" -lt "$CUTOFF_DATE" ]; then
-        echo "  Deleting: $FILE (Date: $TIMESTAMP)" >> "$LOGFILE"
+        echo "  Deleting: $FILE (Date: $TIMESTAMP)" | tee -a "$LOGFILE"
         "$RCLONE" deletefile "$RCLONE_DEST/$FILE" >> "$LOGFILE" 2>&1
         if [ $? -eq 0 ]; then
-            echo "  -> Successfully deleted" >> "$LOGFILE"
+            echo "  ✓ Successfully deleted" | tee -a "$LOGFILE"
         else
-            echo "  -> ERROR during deletion" >> "$LOGFILE"
+            echo "  ✗ ERROR during deletion" | tee -a "$LOGFILE"
         fi
     fi
 done
 
-echo "Cleanup completed." >> "$LOGFILE"
+echo ""
+echo "✓ Cleanup completed." | tee -a "$LOGFILE"
 echo "--- Backup End: $(date) ---" >> "$LOGFILE"
+echo ""
+echo "========================================="
+echo "  Backup completed successfully!"
+echo "========================================="
+echo ""
 
-# Force cleanup and exit
-rm -f "$LOCKFILE" 2>/dev/null
+# Clean exit
+rm -f "$LOCKFILE"
 exit 0
