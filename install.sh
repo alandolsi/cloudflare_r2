@@ -56,13 +56,20 @@ if [ ! -f "syncbackup_cloudflare.sh" ]; then
     echo "❌ ERROR: syncbackup_cloudflare.sh not found in current directory"
     exit 1
 fi
-if [ ! -f "backup.env.example" ]; then
-    echo "❌ ERROR: backup.env.example not found in current directory"
+
+# Check for backup.env.example or backup.env
+if [ -f "backup.env.example" ]; then
+    ENV_SOURCE="backup.env.example"
+elif [ -f "backup.env" ]; then
+    ENV_SOURCE="backup.env"
+    echo "ℹ️  Using backup.env as template (backup.env.example not found)"
+else
+    echo "❌ ERROR: Neither backup.env.example nor backup.env found in current directory"
     exit 1
 fi
 
 cp syncbackup_cloudflare.sh "$INSTALL_DIR/"
-cp backup.env.example "$INSTALL_DIR/"
+cp "$ENV_SOURCE" "$INSTALL_DIR/backup.env.example"
 
 # Make script executable
 chmod +x "$INSTALL_DIR/syncbackup_cloudflare.sh"
