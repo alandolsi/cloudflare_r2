@@ -74,7 +74,7 @@ if [ "$ACTION" = "restore" ] || [ "$ACTION" = "import" ]; then
     echo "--- Restore Start: $(date) ---" >> "$LOGFILE"
     echo "Starting restore from $RESTORE_NAME to $RESTORE_DEST ..." >> "$LOGFILE"
 
-    "$RCLONE" copy "$RCLONE_DEST/$RESTORE_NAME" "$RESTORE_DEST" --transfers=2 --checkers=4 >> "$LOGFILE" 2>&1
+    "$RCLONE" copy "$RCLONE_DEST$RESTORE_NAME" "$RESTORE_DEST" --transfers=2 --checkers=4 >> "$LOGFILE" 2>&1
 
     if [ $? -eq 0 ]; then
         echo "Restore: SUCCESS" >> "$LOGFILE"
