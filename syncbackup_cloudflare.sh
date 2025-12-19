@@ -4,6 +4,14 @@
 # Requires Rclone (v1.60+)
 #
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Try to load backup.env from script directory if it exists and variables are not set
+if [ -f "$SCRIPT_DIR/backup.env" ] && [ -z "$SOURCE" ]; then
+    source "$SCRIPT_DIR/backup.env"
+fi
+
 # --- CONFIGURATION (via Environment Variables or Defaults) ---
 
 # Source directory for backups.
@@ -34,10 +42,89 @@ LOCKFILE="${LOCKFILE:-/var/log/backup_sync.lock}"
 # Default: /usr/bin/rclone (adjust if rclone is installed elsewhere)
 RCLONE="${RCLONE:-/usr/bin/rclone}"
 
-# --- MODE / PARAMETERS ---
-ACTION=${1:-backup}               # backup (default) or restore/import
-RESTORE_NAME=${2:-}               # Name/folder/file on R2 (required for restore/import)
-RESTORE_DEST=${3:-$SOURCE}        # Local destination directory (default: $SOURCE)
+# --- INTERACTIVE MODE ---
+# If no arguments provided, show interactive menu
+if [ $# -eq 0 ]; then
+    echo "========================================="
+    echo "  Cloudflare R2 Backup & Restore Tool"
+    echo "========================================="
+    echo ""
+    echo "What would you like to do?"
+    echo ""
+    echo "  1) Backup - Upload current data to Cloudflare R2"
+    echo "  2) Restore - Download backup from Cloudflare R2"
+    echo "  3) Exit"
+    echo ""
+    read -p "Please select [1-3]: " choice
+    
+    case $choice in
+        1)
+            ACTION="backup"
+            ;;
+        2)
+            ACTION="restore"
+            # Check if rclone is available
+            if [ ! -x "$RCLONE" ]; then
+                echo "ERROR: rclone not found at $RCLONE"
+                exit 1
+            fi
+            
+            echo ""
+            echo "Fetching available backups from R2..."
+            echo ""
+            
+            # List all backup folders
+            mapfile -t BACKUP_FOLDERS < <("$RCLONE" lsf "$RCLONE_DEST" --dirs-only | grep -E "$BACKUP_PATTERN" | sed 's:/$::' | sort -r)
+            
+            if [ ${#BACKUP_FOLDERS[@]} -eq 0 ]; then
+                echo "ERROR: No backup folders found on R2"
+                exit 1
+            fi
+            
+            echo "Available backups:"
+            echo ""
+            for i in "${!BACKUP_FOLDERS[@]}"; do
+                printf "  %2d) %s\n" $((i+1)) "${BACKUP_FOLDERS[$i]}"
+            done
+            echo "   0) Cancel"
+            echo ""
+            
+            read -p "Select backup to restore [0-${#BACKUP_FOLDERS[@]}]: " backup_choice
+            
+            if [ "$backup_choice" -eq 0 ] 2>/dev/null; then
+                echo "Restore cancelled."
+                exit 0
+            fi
+            
+            if [ "$backup_choice" -ge 1 ] && [ "$backup_choice" -le ${#BACKUP_FOLDERS[@]} ] 2>/dev/null; then
+                RESTORE_NAME="${BACKUP_FOLDERS[$((backup_choice-1))]}"
+                echo ""
+                echo "Selected: $RESTORE_NAME"
+                echo ""
+                read -p "Restore to directory [$SOURCE]: " custom_dest
+                RESTORE_DEST="${custom_dest:-$SOURCE}"
+                echo ""
+                echo "Starting restore..."
+            else
+                echo "ERROR: Invalid selection"
+                exit 1
+            fi
+            ;;
+        3)
+            echo "Goodbye!"
+            exit 0
+            ;;
+        *)
+            echo "ERROR: Invalid choice"
+            exit 1
+            ;;
+    esac
+else
+    # --- MODE / PARAMETERS (non-interactive) ---
+    ACTION=${1:-backup}               # backup (default) or restore/import
+    RESTORE_NAME=${2:-}               # Name/folder/file on R2 (required for restore/import)
+    RESTORE_DEST=${3:-$SOURCE}        # Local destination directory (default: $SOURCE)
+fi
 
 # Check for lock file (prevents parallel execution)
 if [ -f "$LOCKFILE" ]; then

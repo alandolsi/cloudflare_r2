@@ -44,12 +44,36 @@ Name the remote, e.g., `cloudflare-backup`. This is the default value for `RCLON
 ```bash
 git clone <repository-url>
 cd cloudflare_r2
-chmod +x syncbackup_cloudflare.sh
+chmod +x install.sh syncbackup_cloudflare.sh
+```
+
+### 4. Install Script (Optional but Recommended)
+
+Run the installation script to set up the backup tool system-wide:
+
+```bash
+sudo ./install.sh
+```
+
+This will:
+- Install the script to `/opt/cloudflare_r2_backup` (or custom location)
+- Create a symlink `/usr/local/bin/cloudflare-r2` for easy access
+- Create configuration file `backup.env`
+- Set up log files
+
+**Or manually copy to desired location:**
+
+```bash
+# Example: Install to /usr/local/share
+sudo mkdir -p /usr/local/share/cloudflare_r2_backup
+sudo cp syncbackup_cloudflare.sh /usr/local/share/cloudflare_r2_backup/
+sudo cp backup.env.example /usr/local/share/cloudflare_r2_backup/backup.env
+sudo chmod +x /usr/local/share/cloudflare_r2_backup/syncbackup_cloudflare.sh
 ```
 
 ## Configuration
 
-The script can be configured via environment variables. Set these variables before executing the script, or export them in your shell session.
+The script automatically loads `backup.env` from the same directory where the script is located. You can also set environment variables manually before execution.
 
 | Variable         | Description                                                                | Default Value                         |
 | :--------------- | :------------------------------------------------------------------------- | :------------------------------------ |
@@ -63,10 +87,16 @@ The script can be configured via environment variables. Set these variables befo
 
 ### Using Environment File
 
-Create a `backup.env` file (copy from `backup.env.example`) to store your configuration:
+The script will automatically load `backup.env` from its own directory if the file exists. 
+
+Create a `backup.env` file (copy from `backup.env.example`) in the same directory as the script:
 
 ```bash
-cp backup.env.example backup.env
+# If installed via install.sh:
+nano /opt/cloudflare_r2_backup/backup.env
+
+# Or in your custom location:
+nano /path/to/your/script/backup.env
 ```
 
 Edit `backup.env` with your settings:
@@ -81,7 +111,7 @@ export LOGFILE="/var/log/backup_sync.log"
 
 ⚠️ **Important:** The `backup.env` file is excluded from Git to protect sensitive data. Never commit credentials to the repository.
 
-**Example Configuration (export before execution):**
+**Alternative: Manual environment variables:**
 
 ```bash
 export SOURCE="/home/user/my_data_to_backup"
@@ -94,34 +124,58 @@ export LOGFILE="/var/log/backup_sync.log"
 
 ## Usage
 
-### Create a Backup
+### Interactive Mode (Recommended)
+
+Simply run the script without arguments for an interactive menu:
 
 ```bash
-./syncbackup_cloudflare.sh
-# or explicitly:
-./syncbackup_cloudflare.sh backup
+# If installed system-wide:
+cloudflare-r2
+
+# Or with full path:
+/opt/cloudflare_r2_backup/syncbackup_cloudflare.sh
+
+# Or from your custom location:
+/path/to/syncbackup_cloudflare.sh
 ```
 
-### Perform a Restore (Import)
+The script will guide you through:
+1. **Choosing between Backup or Restore**
+2. **Selecting from available backups** (if restoring)
+3. **Choosing destination directory** (optional)
+
+### Command Line Mode
+
+**Create a Backup**
+
+```bash
+# If installed system-wide:
+cloudflare-r2 backup
+
+# Or:
+/opt/cloudflare_r2_backup/syncbackup_cloudflare.sh backup
+```
+
+**Perform a Restore (Import)**
 
 **Automatically restore the latest backup:**
 ```bash
-./syncbackup_cloudflare.sh restore
+cloudflare-r2 restore
 ```
 
 **Restore a specific backup folder:**
 ```bash
-./syncbackup_cloudflare.sh restore backup-2025-12-17-01-00-45
+cloudflare-r2 restore backup-2025-12-17-01-00-45
 ```
 
 **Restore to a different destination directory:**
 ```bash
-./syncbackup_cloudflare.sh restore backup-2025-12-17-01-00-45 /tmp/restore
+cloudflare-r2 restore backup-2025-12-17-01-00-45 /tmp/restore
 ```
 
 ## Automation with Cron
 
-Add a Cron job for regular backups:
+Add a Cron job for regular backups. **Important:** When running via cron, you must explicitly pass the `backup` argument to avoid the interactive menu.
 
 ```bash
 sudo crontab -e
@@ -130,20 +184,24 @@ sudo crontab -e
 Examples:
 
 ```bash
-# Daily at 4:00 AM with environment file
-0 4 * * * . /root/cloudflare_r2/backup.env; /bin/bash /root/cloudflare_r2/syncbackup_cloudflare.sh
+# Daily at 4:00 AM (if installed to /opt/cloudflare_r2_backup)
+0 4 * * * /opt/cloudflare_r2_backup/syncbackup_cloudflare.sh backup >> /var/log/syncbackup_cloudflare.cron.log 2>&1
 
-# Daily at 2:00 AM (using inline environment variables)
-0 2 * * * /path/to/syncbackup_cloudflare.sh backup
+# Daily at 4:00 AM (using system-wide command - RECOMMENDED)
+0 4 * * * /usr/local/bin/cloudflare-r2 backup >> /var/log/syncbackup_cloudflare.cron.log 2>&1
 
 # Every 6 hours
-0 */6 * * * /path/to/syncbackup_cloudflare.sh backup
+0 */6 * * * /opt/cloudflare_r2_backup/syncbackup_cloudflare.sh backup
 
 # Every Sunday at 3:00 AM
-0 3 * * 0 /path/to/syncbackup_cloudflare.sh backup
+0 3 * * 0 /opt/cloudflare_r2_backup/syncbackup_cloudflare.sh backup
 ```
 
-**Note:** When using the environment file approach, make sure to source the file (`. /path/to/backup.env`) before running the script in the same command.
+**Note:** 
+- The script automatically loads `backup.env` from its own directory
+- Always pass `backup` as the first argument in cron to skip the interactive menu
+- The script logs go to `/var/log/backup_sync.log`
+- Optional: Redirect cron output to a separate log file with `>> /var/log/syncbackup_cloudflare.cron.log 2>&1`
 
 ## Logging
 
