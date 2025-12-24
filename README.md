@@ -46,7 +46,7 @@ Choose:
 
 ```bash
 cd ~
-git clone https://github.com/alandolsi/cloudflare_r2.git
+git clone https://github.com/alandolsi/mailcow-cloudflare-r2-backup.git
 cd cloudflare_r2
 chmod +x install.sh
 sudo ./install.sh
