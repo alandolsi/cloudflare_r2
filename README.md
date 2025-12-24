@@ -47,7 +47,7 @@ Choose:
 ```bash
 cd ~
 git clone https://github.com/alandolsi/mailcow-cloudflare-r2-backup.git
-cd cloudflare_r2
+cd mailcow-cloudflare-r2-backup
 chmod +x install.sh
 sudo ./install.sh
 ```
@@ -205,7 +205,7 @@ Cloudflare R2 offers:
 
 **Script update fails**
 - Ensure you're using symlink installation (see Installation step 3)
-- Manual update: `cd ~/cloudflare_r2 && git pull`
+- Manual update: `cd ~/mailcow-cloudflare-r2-backup && git pull`
 
 ## About
 
@@ -213,7 +213,7 @@ Created by **Landolsi Webdesign** for reliable Mailcow backups to Cloudflare R2.
 
 🌐 **Website:** [landolsi.de](https://www.landolsi.de)  
 📧 **Contact:** abdellatif@landolsi.de  
-💻 **GitHub:** [alandolsi/cloudflare_r2](https://github.com/alandolsi/cloudflare_r2)
+💻 **GitHub:** [alandolsi/mailcow-cloudflare-r2-backup](https://github.com/alandolsi/mailcow-cloudflare-r2-backup)
 
 ## Contributing
 
