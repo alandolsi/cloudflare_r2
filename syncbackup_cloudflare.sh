@@ -77,7 +77,7 @@ if [ $# -eq 0 ]; then
             echo ""
             
             # List all backup folders
-            mapfile -t BACKUP_FOLDERS < <("$RCLONE" lsf "$RCLONE_DEST_TRIMMED" --dirs-only | grep -E "$BACKUP_PATTERN" | sed 's:/$::' | sort -r)
+            mapfile -t BACKUP_FOLDERS < <("$RCLONE" lsf "$RCLONE_DEST_TRIMMED" --dirs-only | tr -d '\r' | grep -E "$BACKUP_PATTERN" | sed 's:/$::' | sort -r)
             
             if [ ${#BACKUP_FOLDERS[@]} -eq 0 ]; then
                 echo "ERROR: No backup folders found on R2"
@@ -192,7 +192,7 @@ if [ "$ACTION" = "restore" ] || [ "$ACTION" = "import" ]; then
     if [ -z "$RESTORE_NAME" ]; then
         echo "Searching for the newest backup folder..." >> "$LOGFILE"
         # List all folders, sort descending and take the first one (newest)
-        RESTORE_NAME=$("$RCLONE" lsf "$RCLONE_DEST_TRIMMED" --dirs-only | grep -E "$BACKUP_PATTERN" | sort -r | head -n 1 | sed 's:/$::')
+        RESTORE_NAME=$("$RCLONE" lsf "$RCLONE_DEST_TRIMMED" --dirs-only | tr -d '\r' | grep -E "$BACKUP_PATTERN" | sort -r | head -n 1 | sed 's:/$::')
         
         if [ -z "$RESTORE_NAME" ]; then
             echo "$(date): ERROR - No backup folder found" >> "$LOGFILE"
@@ -321,6 +321,7 @@ DELETED_COUNT=0
 # Get candidate backup dirs using the same approach that works in manual tests
 mapfile -t BACKUP_DIRS < <(
     "$RCLONE" lsf "$RCLONE_DEST_TRIMMED" --dirs-only 2>> "$LOGFILE" \
+    | tr -d '\r' \
     | grep -E -- "$BACKUP_PATTERN" \
     | sort -r
 )
