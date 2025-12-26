@@ -314,13 +314,11 @@ echo "  Cleaning up old backups..."
 echo "========================================="
 echo ""
 echo "Retention policy: Keep latest $RETENTION_DAYS backups" | tee -a "$LOGFILE"
-echo "Backup pattern: $BACKUP_PATTERN" | tee -a "$LOGFILE"
 echo ""
 
 DELETED_COUNT=0
 CURRENT_COUNT=0
 
-echo "Checking existing backups on R2..."
 # List all backup files with timestamp, sort by time descending (newest first)
 while read -r DATE TIME DIR; do
     TIMESTAMP="$DATE $TIME"
@@ -329,20 +327,19 @@ while read -r DATE TIME DIR; do
     
     # Consider only directories matching BACKUP_PATTERN
     if ! echo "${DIR}/" | grep -Eq "$BACKUP_PATTERN"; then
-        echo "  [SKIP] Pattern mismatch: ${DIR}/" | tee -a "$LOGFILE"
         continue
     fi
 
     ((CURRENT_COUNT++))
 
     if [ "$CURRENT_COUNT" -gt "$RETENTION_DAYS" ]; then
-        echo "  [DELETE] Backup $CURRENT_COUNT ($TIMESTAMP) > Limit $RETENTION_DAYS: $DIR" | tee -a "$LOGFILE"
+        echo "  Deleting old backup ($CURRENT_COUNT > $RETENTION_DAYS): $DIR (Date: $TIMESTAMP)" | tee -a "$LOGFILE"
         "$RCLONE" purge "${RCLONE_DEST_TRIMMED}/${DIR}" >> "$LOGFILE" 2>&1
         if [ $? -eq 0 ]; then
             ((DELETED_COUNT++))
         fi
     else
-        echo "  [KEEP]   Backup $CURRENT_COUNT ($TIMESTAMP): $DIR" | tee -a "$LOGFILE"
+        echo "  Keeping backup $CURRENT_COUNT: $DIR (Date: $TIMESTAMP)" >> "$LOGFILE"
     fi
 done < <("$RCLONE" lsf "$RCLONE_DEST_TRIMMED" --dirs-only --format "tp" | sort -r)
 
