@@ -317,42 +317,37 @@ echo "Retention policy: Keep latest $RETENTION_DAYS backups" | tee -a "$LOGFILE"
 echo ""
 
 DELETED_COUNT=0
-CURRENT_COUNT=0
 
-mapfile -t ALL_DIRS < <("$RCLONE" lsf "$RCLONE_DEST_TRIMMED" --dirs-only 2>> "$LOGFILE" | sort -r)
+# Get candidate backup dirs using the same approach that works in manual tests
+mapfile -t BACKUP_DIRS < <(
+    "$RCLONE" lsf "$RCLONE_DEST_TRIMMED" --dirs-only 2>> "$LOGFILE" \
+    | grep -E -- "$BACKUP_PATTERN" \
+    | sort -r
+)
 
-if [ ${#ALL_DIRS[@]} -eq 0 ]; then
-    echo "  No directories found at destination (check RCLONE_DEST and rclone config)" | tee -a "$LOGFILE"
+CURRENT_COUNT=${#BACKUP_DIRS[@]}
+echo "  Found $CURRENT_COUNT backup folder(s) matching pattern" | tee -a "$LOGFILE"
+
+if [ "$CURRENT_COUNT" -eq 0 ]; then
+    echo "  WARNING: No backups matched BACKUP_PATTERN. Check backup.env BACKUP_PATTERN and destination path." | tee -a "$LOGFILE"
 fi
 
-# List all backup folders, sort by name descending (newest first due to YYYY-MM-DD naming)
-for DIR in "${ALL_DIRS[@]}"; do
-    # Normalize directory name
-    DIR=${DIR%/}
+# Delete everything older than the newest RETENTION_DAYS backups
+for i in "${!BACKUP_DIRS[@]}"; do
+    DIR=${BACKUP_DIRS[$i]%/}
     DIR=${DIR%$'\r'}
 
-    # Consider only directories matching BACKUP_PATTERN (support patterns with or without trailing slash)
-    if ! printf '%s\n%s/\n' "$DIR" "$DIR" | grep -Eq "$BACKUP_PATTERN"; then
-        continue
-    fi
-
-    ((CURRENT_COUNT++))
-
-    if [ "$CURRENT_COUNT" -gt "$RETENTION_DAYS" ]; then
-        echo "  Deleting old backup ($CURRENT_COUNT > $RETENTION_DAYS): $DIR" | tee -a "$LOGFILE"
+    IDX=$((i + 1))
+    if [ "$IDX" -gt "$RETENTION_DAYS" ]; then
+        echo "  Deleting old backup ($IDX > $RETENTION_DAYS): $DIR" | tee -a "$LOGFILE"
         "$RCLONE" purge "${RCLONE_DEST_TRIMMED}/${DIR}" >> "$LOGFILE" 2>&1
         if [ $? -eq 0 ]; then
             ((DELETED_COUNT++))
         fi
     else
-        echo "  Keeping backup $CURRENT_COUNT: $DIR" >> "$LOGFILE"
+        echo "  Keeping backup $IDX: $DIR" >> "$LOGFILE"
     fi
 done
-
-echo "  Found $CURRENT_COUNT backup folder(s) matching pattern" | tee -a "$LOGFILE"
-if [ "$CURRENT_COUNT" -eq 0 ]; then
-    echo "  WARNING: No backups matched BACKUP_PATTERN. Check backup.env BACKUP_PATTERN and destination path." | tee -a "$LOGFILE"
-fi
 
 echo ""
 if [ "$DELETED_COUNT" -gt 0 ]; then
