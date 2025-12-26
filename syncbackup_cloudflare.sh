@@ -339,8 +339,22 @@ CURRENT_COUNT=${#BACKUP_DIRS[@]}
 echo "  Found $CURRENT_COUNT backup folder(s) matching pattern" | tee -a "$LOGFILE"
 
 if [ "$CURRENT_COUNT" -eq 0 ]; then
-    echo "  WARNING: No backups matched BACKUP_PATTERN. Check backup.env BACKUP_PATTERN and destination path." | tee -a "$LOGFILE"
-    echo "  Hint: run: rclone lsf \"$RCLONE_DEST_TRIMMED\" --dirs-only | tr -d \\r | grep -E -- \"$BACKUP_PATTERN\"" | tee -a "$LOGFILE"
+    echo "  WARNING: No backups matched BACKUP_PATTERN. Falling back to '^mailcow-' matching." | tee -a "$LOGFILE"
+    echo "  Current BACKUP_PATTERN: $(printf '%q' "$BACKUP_PATTERN")" | tee -a "$LOGFILE"
+
+    mapfile -t BACKUP_DIRS < <(
+        printf '%s\n' "$LSF_OUTPUT" \
+        | tr -d '\r' \
+        | grep -E -- '^mailcow-' \
+        | sort -r
+    )
+
+    CURRENT_COUNT=${#BACKUP_DIRS[@]}
+    echo "  Found $CURRENT_COUNT backup folder(s) using fallback" | tee -a "$LOGFILE"
+
+    if [ "$CURRENT_COUNT" -eq 0 ]; then
+        echo "  ERROR: No mailcow backup folders found at destination: $RCLONE_DEST_TRIMMED" | tee -a "$LOGFILE"
+    fi
 fi
 
 # Delete everything older than the newest RETENTION_DAYS backups
