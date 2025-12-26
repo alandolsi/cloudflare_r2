@@ -314,19 +314,24 @@ echo "  Cleaning up old backups..."
 echo "========================================="
 echo ""
 echo "Retention policy: Keep latest $RETENTION_DAYS backups" | tee -a "$LOGFILE"
+echo "DEBUG: Pattern is '$BACKUP_PATTERN'" | tee -a "$LOGFILE"
 echo ""
 
 DELETED_COUNT=0
 CURRENT_COUNT=0
 
+echo "DEBUG: Listing files..."
 # List all backup files with timestamp, sort by time descending (newest first)
 while read -r DATE TIME DIR; do
     TIMESTAMP="$DATE $TIME"
     # Normalize directory name (remove trailing slash)
     DIR=${DIR%/}
     
+    echo "DEBUG: Checking '$DIR'"
+    
     # Consider only directories matching BACKUP_PATTERN
     if ! echo "${DIR}/" | grep -Eq "$BACKUP_PATTERN"; then
+        echo "  [SKIP] Pattern mismatch: ${DIR}/" | tee -a "$LOGFILE"
         continue
     fi
 
